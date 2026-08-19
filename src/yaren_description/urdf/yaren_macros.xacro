@@ -1,0 +1,121 @@
+<?xml version="1.0"?>
+<!--
+  yaren_macros.xacro
+  Macros reutilizables para construir el modelo: tensores de inercia,
+  eslabones (visual + colision + inercia) y articulaciones revolutas.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ==================================================================
+       Tensor de inercia de un prisma rectangular homogeneo, centrado en
+       el origen que se le pase.
+
+         Ixx = m/12 * (dy^2 + dz^2)
+         Iyy = m/12 * (dx^2 + dz^2)
+         Izz = m/12 * (dx^2 + dy^2)
+
+       Se calcula aqui en lugar de escribir 13 tensores a mano: los
+       valores quedan ligados a las dimensiones reales del eslabon, de
+       modo que si se ajusta la geometria la inercia se recalcula sola.
+       ================================================================== -->
+  <xacro:macro name="inercia_caja" params="masa dx dy dz *origen">
+    <inertial>
+      <xacro:insert_block name="origen"/>
+      <mass value="${masa}"/>
+      <inertia
+        ixx="${masa * (dy*dy + dz*dz) / 12.0}"
+        iyy="${masa * (dx*dx + dz*dz) / 12.0}"
+        izz="${masa * (dx*dx + dy*dy) / 12.0}"
+        ixy="0.0" ixz="0.0" iyz="0.0"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- ==================================================================
+       Tensor de inercia de un cilindro solido homogeneo con eje Z.
+
+         Ixx = Iyy = m/12 * (3r^2 + h^2)
+         Izz = m/2 * r^2
+       ================================================================== -->
+  <xacro:macro name="inercia_cilindro" params="masa radio altura *origen">
+    <inertial>
+      <xacro:insert_block name="origen"/>
+      <mass value="${masa}"/>
+      <inertia
+        ixx="${masa * (3.0*radio*radio + altura*altura) / 12.0}"
+        iyy="${masa * (3.0*radio*radio + altura*altura) / 12.0}"
+        izz="${masa * radio * radio / 2.0}"
+        ixy="0.0" ixz="0.0" iyz="0.0"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- ==================================================================
+       Eslabon completo del robot.
+
+       La geometria <visual> usa la malla STL del CAD, pero <collision>
+       usa una caja envolvente. Es una decision de rendimiento: varias de
+       las mallas superan los 8 MB y el motor de fisica tendria que
+       evaluar decenas de miles de triangulos por paso de integracion.
+       Con primitivas el coste de la deteccion de contactos es constante.
+
+       Parametros:
+         nombre      nombre del link
+         malla       nombre del fichero STL dentro de meshes/
+         material    material declarado en yaren_materials.xacro
+         masa        masa estimada en kg
+         cx cy cz    dimensiones de la caja de colision e inercia (m)
+         ox oy oz    centro de la caja respecto al origen del link (m)
+         mx my mz    desplazamiento de la malla visual respecto al link (m)
+       ================================================================== -->
+  <xacro:macro name="eslabon"
+               params="nombre malla material masa cx cy cz
+                       ox:=0 oy:=0 oz:=0
+                       mx:=0 my:=0 mz:=0">
+    <link name="${nombre}">
+
+      <visual>
+        <origin xyz="${mx} ${my} ${mz}" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://yaren_description/meshes/${malla}"/>
+        </geometry>
+        <material name="${material}"/>
+      </visual>
+
+      <collision>
+        <origin xyz="${ox} ${oy} ${oz}" rpy="0 0 0"/>
+        <geometry>
+          <box size="${cx} ${cy} ${cz}"/>
+        </geometry>
+      </collision>
+
+      <xacro:inercia_caja masa="${masa}" dx="${cx}" dy="${cy}" dz="${cz}">
+        <origin xyz="${ox} ${oy} ${oz}" rpy="0 0 0"/>
+      </xacro:inercia_caja>
+
+    </link>
+  </xacro:macro>
+
+  <!-- ==================================================================
+       Articulacion revoluta.
+
+       El bloque <dynamics> no es opcional en simulacion: sin
+       amortiguamiento viscoso el integrador deja las articulaciones
+       oscilando de forma indefinida alrededor de la consigna, porque
+       nada disipa la energia introducida por el controlador de posicion.
+       ================================================================== -->
+  <xacro:macro name="articulacion"
+               params="nombre padre hijo xyz rpy axis
+                       inferior superior
+                       esfuerzo:=10.0 velocidad:=3.0
+                       amortiguamiento:=0.5 friccion:=0.1">
+    <joint name="${nombre}" type="revolute">
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+      <parent link="${padre}"/>
+      <child  link="${hijo}"/>
+      <axis xyz="${axis}"/>
+      <limit lower="${inferior}" upper="${superior}"
+             effort="${esfuerzo}" velocity="${velocidad}"/>
+      <dynamics damping="${amortiguamiento}" friction="${friccion}"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

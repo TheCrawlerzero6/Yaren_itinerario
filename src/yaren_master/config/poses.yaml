@@ -1,0 +1,160 @@
+# poses.yaml
+#
+# Catalogo de posturas del robot Yaren y secuencias de itinerario.
+#
+# Una postura es un vector de 12 valores en radianes, uno por
+# articulacion, en el orden declarado en 'articulaciones'. Ese orden se
+# declara aqui de forma explicita en lugar de darse por supuesto: los
+# nodos de control lo comparan con el orden del controlador y reordenan
+# los valores si difieren, de modo que este fichero puede reorganizarse
+# sin riesgo de enviar una consigna a la articulacion equivocada.
+#
+# Funcion de cada articulacion, deducida propagando las rotaciones de la
+# cadena desde el marco del mundo:
+#
+#   joint_1   giro de cintura              eje +Z del mundo
+#   joint_2   inclinacion del torso        eje casi -Y
+#   joint_3   giro de la cabeza            eje casi +Z
+#   joint_4   inclinacion de la cabeza
+#   joint_5   hombro, primer eje           eje casi -X
+#   joint_6   hombro, segundo eje          eje casi +Y
+#   joint_7   hombro, tercer eje
+#   joint_8   codo
+#   joint_9   hombro opuesto, primer eje   eje casi +X
+#   joint_10  hombro opuesto, segundo eje
+#   joint_11  hombro opuesto, tercer eje
+#   joint_12  codo opuesto
+#
+# Las doce declaran el mismo limite en la descripcion del robot, +-10 rad,
+# que son +-573 grados: en la practica ninguna esta acotada. Los valores de
+# este catalogo se mantienen dentro de +-2.6 rad por criterio propio, no
+# porque el modelo lo imponga.
+#
+# Sobre los signos: los primeros ejes de los dos hombros, joint_5 y
+# joint_9, apuntan en sentidos opuestos en el marco del mundo. Por eso
+# una postura simetrica necesita valores de signo contrario en los dos
+# brazos, y no el mismo valor en ambos.
+
+articulaciones:
+  - joint_1
+  - joint_2
+  - joint_3
+  - joint_4
+  - joint_5
+  - joint_6
+  - joint_7
+  - joint_8
+  - joint_9
+  - joint_10
+  - joint_11
+  - joint_12
+
+# Duracion aplicada cuando quien ordena una postura no especifica otra.
+duracion_por_defecto: 3.0
+
+# Postura a la que responde el servicio de retorno a origen.
+pose_inicial: home
+
+
+poses:
+
+  # Todas las articulaciones en cero: es la postura de referencia del
+  # modelo y la que adopta el robot al arrancar la simulacion.
+  #
+  #       j1    j2    j3    j4  | j5  j6  j7  j8 | j9 j10 j11 j12
+  home: [ 0.0,  0.0,  0.0,  0.0,
+          0.0, 0.0, 0.0, 0.0,
+          0.0, 0.0, 0.0, 0.0]
+
+  # Brazos plegados contra el cuerpo. Postura compacta, pensada como
+  # posicion de parada entre movimientos.
+  reposo: [ 0.0, 0.0, 0.0, 0.0,
+            0.6, -1.2,  0.4, 0.0,
+           -0.6,  1.2, -0.4, 0.0]
+
+  # Brazos abiertos hacia los lados, sin flexion de codo. Deja el
+  # espacio de trabajo despejado y sirve de transicion entre posturas.
+  extendido: [ 0.0, 0.0, 0.0, 0.0,
+              -0.8, 0.0, 0.0, 0.0,
+               0.8, 0.0, 0.0, 0.0]
+
+  # Cintura girada a un lado, brazos abiertos. Muestra el recorrido de la
+  # cintura sin mover el resto de la cadena.
+  giro_izquierda: [ 0.7, 0.0, 0.0, 0.0,
+                   -0.8, 0.0, 0.0, 0.0,
+                    0.8, 0.0, 0.0, 0.0]
+
+  giro_derecha: [-0.7, 0.0, 0.0, 0.0,
+                 -0.8, 0.0, 0.0, 0.0,
+                  0.8, 0.0, 0.0, 0.0]
+
+  # Torso inclinado hacia delante con la cabeza levantada.
+  inclinado: [ 0.0, 0.5, 0.4, 0.0,
+              -0.8, 0.0, 0.0, 0.0,
+               0.8, 0.0, 0.0, 0.0]
+
+  # Brazo de la rama joint_5 elevado y flexionado, con la cabeza girada
+  # hacia el. Las dos variantes solo difieren en joint_8, el codo:
+  # alternar entre ellas produce el gesto de saludo.
+  saludo_a: [ 0.0, 0.0, 0.3, 0.0,
+             -1.2,  0.5, -0.9,  0.6,
+             -0.6,  1.2, -0.4,  0.0]
+
+  saludo_b: [ 0.0, 0.0, 0.3, 0.0,
+             -1.2,  0.5, -0.9, -0.6,
+             -0.6,  1.2, -0.4,  0.0]
+
+  # Ambos brazos hacia delante y hacia abajo, a la altura del tablero de
+  # la mesa del mundo de simulacion (tablero a 0.17 m, piezas a 0.195 m,
+  # a unos 0.20 m de cada hombro).
+  #
+  # Estos valores son una primera aproximacion geometrica y son los
+  # unicos del catalogo que dependen del mobiliario del mundo: conviene
+  # afinarlos observando donde quedan realmente las manos.
+  hacia_mesa: [ 0.0, 0.35, 0.2, 0.0,
+               -1.1,  0.6, -0.3,  0.5,
+                1.1, -0.6,  0.3, -0.5]
+
+
+secuencias:
+
+  # Itinerario principal. Recorre los cuatro grupos articulares en orden:
+  # cintura, torso, cabeza y por ultimo los dos brazos, y cierra volviendo
+  # a la postura de referencia.
+  demostracion:
+    - {pose: home,           duracion: 2.0}
+    - {pose: extendido,      duracion: 3.0}
+    - {pose: giro_izquierda, duracion: 3.0}
+    - {pose: giro_derecha,   duracion: 4.0}
+    - {pose: extendido,      duracion: 3.0}
+    - {pose: inclinado,      duracion: 3.0}
+    - {pose: hacia_mesa,     duracion: 4.0}
+    - {pose: saludo_a,       duracion: 3.0}
+    - {pose: saludo_b,       duracion: 1.0}
+    - {pose: saludo_a,       duracion: 1.0}
+    - {pose: saludo_b,       duracion: 1.0}
+    - {pose: reposo,         duracion: 3.0}
+    - {pose: home,           duracion: 3.0}
+
+  # Secuencia corta, util para comprobar rapidamente que la cadena de
+  # control responde sin esperar al itinerario completo.
+  saludo:
+    - {pose: home,     duracion: 2.0}
+    - {pose: saludo_a, duracion: 3.0}
+    - {pose: saludo_b, duracion: 1.0}
+    - {pose: saludo_a, duracion: 1.0}
+    - {pose: saludo_b, duracion: 1.0}
+    - {pose: home,     duracion: 3.0}
+
+  # Ejercita un grupo articular por vez, volviendo a home entre cada uno.
+  # Con los nombres de las articulaciones a la vista, sirve para
+  # comprobar que cada movimiento corresponde a lo que su nombre anuncia.
+  verificacion:
+    - {pose: home,           duracion: 2.0}
+    - {pose: giro_izquierda, duracion: 3.0}
+    - {pose: home,           duracion: 3.0}
+    - {pose: inclinado,      duracion: 3.0}
+    - {pose: home,           duracion: 3.0}
+    - {pose: extendido,      duracion: 3.0}
+    - {pose: reposo,         duracion: 3.0}
+    - {pose: home,           duracion: 3.0}

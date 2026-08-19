@@ -1,0 +1,369 @@
+<?xml version="1.0"?>
+<!--
+  yaren.urdf.xacro
+  Descripcion completa del robot Yaren: cadena cinematica, propiedades
+  inerciales, geometria de colision e integracion con el simulador.
+
+  ESTRUCTURA DEL ROBOT
+
+  Yaren es un torso humanoide de base fija con 12 grados de libertad. La
+  cadena no es serial: de link_2, la pieza central del torso, parten tres
+  ramas, el cuello y los dos brazos.
+
+      world
+        | base_joint       (articulacion fija)
+      base_link
+        | joint_1
+      link_1
+        | joint_2
+      link_2
+        |
+        +> joint_3   > link_3
+        |  joint_4   > link_4
+        |
+        +> joint_5   > link_5
+        |  joint_6   > link_6
+        |  joint_7   > link_7
+        |  joint_8   > link_8
+        |
+        +> joint_9   > link_9
+           joint_10  > link_10
+           joint_11  > link_11
+           joint_12  > link_12
+
+  FUNCION DE CADA ARTICULACION
+
+  El URDF declara cada eje en el marco local del eslabon, que tras
+  acumular las rotaciones de la cadena no coincide con lo que se ve. La
+  columna del eje en el mundo se obtuvo propagando las rotaciones desde
+  'world' con todas las articulaciones en cero, y es la que explica que
+  hace realmente cada una:
+
+    joint_1              eje +Z          giro de cintura
+    joint_2              eje casi -Y     inclinacion del torso
+    joint_3              eje casi +Z     giro de la cabeza
+    joint_4              -               inclinacion de la cabeza
+    joint_5  / joint_9   ejes -X / +X    primer eje de hombro, en espejo
+    joint_6  / joint_10  ejes casi +-Y   segundo eje de hombro
+    joint_7  / joint_11  -               tercer eje de hombro
+    joint_8  / joint_12  -               codo
+
+  Los tres primeros ejes de cada brazo estan separados solo 0.037 m y
+  0.031 m, mientras que el cuarto queda a 0.091 m del anterior. Esa
+  distribucion es la de un hombro de tres grados de libertad con los ejes
+  practicamente concurrentes, seguido del brazo y del codo, y es el
+  criterio con el que se han agrupado en la tabla.
+
+  POSICIONES CARACTERISTICAS
+
+  Con todas las articulaciones en cero, propagando los origenes desde el
+  marco del mundo:
+
+      hombro de la rama joint_5   (-0.106,  0.000, 0.255) m
+      hombro de la rama joint_9   ( 0.106,  0.000, 0.255) m
+      cuello                      ( 0.000, -0.012, 0.271) m
+
+  El alcance de cada brazo, sumando las distancias entre ejes
+  consecutivos (0.037 + 0.031 + 0.091 mas el ultimo eslabon), es de unos
+  0.24 m desde el hombro. Ese valor es el que dimensiona el mobiliario
+  del mundo de simulacion.
+
+  Argumentos:
+    sim               true  -> interfaz de hardware simulada (gz_ros2_control)
+                      false -> interfaz de hardware real sobre bus Dynamixel
+    controllers_file  ruta al YAML de controladores que carga el plugin
+                      del simulador
+
+  Generar el URDF plano:
+    xacro yaren.urdf.xacro sim:=true > /tmp/yaren.urdf
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="yaren">
+
+  <xacro:arg name="sim" default="true"/>
+
+  <!-- La ruta del YAML se declara como argumento y no se incrusta fija
+       para que el fichero de arranque pueda inyectar una configuracion
+       de controladores distinta sin tocar la descripcion del robot. -->
+  <xacro:arg name="controllers_file"
+             default="$(find yaren_master)/config/yaren_controllers.yaml"/>
+
+  <!-- ==================================================================
+       LIMITES ARTICULARES
+
+       Son los declarados en el modelo de partida: identicos en las doce
+       articulaciones. Se recogen en propiedades para no repetir el mismo
+       numero veinticuatro veces, pero el valor es el original.
+
+       Nota para quien retome el modelo: +-10 rad son +-573 grados, es
+       decir que ninguna articulacion esta realmente acotada. Los topes
+       mecanicos habria que medirlos sobre el robot fisico y declararlos
+       aqui; hasta entonces ni la saturacion del teleoperador ni el aviso
+       de "junta en su tope" del vigilante de estado tienen efecto.
+       ================================================================== -->
+  <xacro:property name="lim_junta" value="10.0"/>
+
+  <!-- Par y velocidad maximos declarados en el modelo de partida. -->
+  <xacro:property name="par_max" value="300"/>
+  <xacro:property name="vel_max" value="3"/>
+
+  <!-- ==================================================================
+       MASAS ESTIMADAS (kg)
+
+       Los doce eslabones moviles no traen masa en el modelo de partida.
+       Los valores de aqui son estimaciones geometricas: cada eslabon se
+       aproxima por su caja envolvente suponiendo densidad de pieza
+       impresa en 3D con servo integrado.
+       Son suficientes para que la simulacion sea estable y las
+       proporciones entre eslabones sean realistas, pero deberian
+       sustituirse por los valores exactos del exportador CAD antes de
+       usar el modelo para calculos dinamicos o de consumo.
+
+       Los nombres son descriptivos porque son variables internas de este
+       fichero, no nombres de la cadena cinematica.
+       ================================================================== -->
+  <xacro:property name="m_cintura"   value="0.15"/>     <!-- link_1 -->
+  <xacro:property name="m_torso"     value="0.35"/>     <!-- link_2 -->
+  <xacro:property name="m_cuello"    value="0.08"/>     <!-- link_3 -->
+  <xacro:property name="m_cabeza"    value="0.06"/>     <!-- link_4 -->
+  <xacro:property name="m_hombro_a"  value="0.10"/>     <!-- link_5,  link_9 -->
+  <xacro:property name="m_hombro_b"  value="0.10"/>     <!-- link_6,  link_10 -->
+  <xacro:property name="m_brazo"     value="0.12"/>     <!-- link_7,  link_11 -->
+  <xacro:property name="m_antebrazo" value="0.15"/>     <!-- link_8,  link_12 -->
+
+  <xacro:include filename="$(find yaren_description)/urdf/yaren_materials.xacro"/>
+  <xacro:include filename="$(find yaren_description)/urdf/yaren_macros.xacro"/>
+  <xacro:include filename="$(find yaren_description)/urdf/yaren_gazebo.xacro"/>
+  <xacro:include filename="$(find yaren_description)/urdf/yaren_ros2_control.xacro"/>
+
+  <!-- ==================================================================
+       BASE
+
+       El robot es de base fija: se ancla al marco inercial 'world'
+       mediante una articulacion fija. Sin este anclaje el modelo seria
+       un cuerpo libre y caeria al iniciar la simulacion.
+       ================================================================== -->
+  <link name="world"/>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="world"/>
+    <child  link="base_link"/>
+    <origin xyz="0.0 0.0 0.064" rpy="0.0 0.0 0.0"/>
+  </joint>
+
+  <!-- base_link se escribe como bloque explicito, y no con la macro de
+       eslabon, porque es el unico link que ya venia completo en el
+       modelo de partida: trae su tensor de inercia del CAD y su malla de
+       colision. Se reproduce tal cual.
+
+       Que la colision sea la malla y no una primitiva no penaliza la
+       simulacion: base_link esta anclado a world por una articulacion
+       fija, asi que el motor de fisica lo trata como cuerpo estatico y
+       no evalua contactos entre estaticos. Por la misma razon su tensor
+       de inercia no interviene en la dinamica. -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="-0.011194 -0.036845 0.215654" rpy="0 0 0" />
+      <mass value="1.3678" />
+      <inertia ixx="0.00319" ixy="0.0" ixz="0.0" iyy="0.00601" iyz="0.0" izz="0.00319" />
+    </inertial>
+    <visual>
+      <origin xyz="0.01 0.2105 0.0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://yaren_description/meshes/base_link.STL" />
+      </geometry>
+      <material name="Black"/>
+    </visual>
+    <collision>
+      <origin xyz="0.01 0.2105 0.0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://yaren_description/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <!-- ==================================================================
+       CINTURA - 2 GDL
+       ================================================================== -->
+
+  <!-- Eje +Z del mundo: gira todo el robot sobre el eje vertical. -->
+  <xacro:articulacion nombre="joint_1" padre="base_link" hijo="link_1"
+                      xyz="0.0 0.0 0.020523" rpy="1.5708 0.0 1.6008"
+                      axis="0 1 0"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <xacro:eslabon nombre="link_1" malla="Link_1.STL" material="MediumYellow"
+                 masa="${m_cintura}"
+                 cx="0.060" cy="0.0715" cz="0.060"
+                 ox="0.0"   oy="0.0358" oz="0.0"/>
+
+  <!-- Eje casi -Y del mundo: inclina el torso adelante y atras. -->
+  <xacro:articulacion nombre="joint_2" padre="link_1" hijo="link_2"
+                      xyz="0.0 0.0715 0.0" rpy="0.0 1.5708 0.0"
+                      axis="0 0 -1"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <!-- Pieza central del torso: es el eslabon mas voluminoso porque
+       soporta las tres ramas. Su caja envolvente se deduce de la
+       posicion de los tres hijos: el cuello a 0.1145 en Y y los dos
+       hombros a +-0.106 en X. -->
+  <xacro:eslabon nombre="link_2" malla="Link_2.STL" material="MediumYellow"
+                 masa="${m_torso}"
+                 cx="0.240" cy="0.125" cz="0.070"
+                 ox="0.0"   oy="0.058" oz="0.0"/>
+
+  <!-- ==================================================================
+       CABEZA - 2 GDL
+
+       El cuello queda en (0, -0.012, 0.271) en coordenadas del mundo,
+       centrado sobre el torso.
+       ================================================================== -->
+
+  <!-- Eje casi +Z del mundo: gira la cabeza a izquierda y derecha. -->
+  <xacro:articulacion nombre="joint_3" padre="link_2" hijo="link_3"
+                      xyz="0.0 0.1145 -0.012" rpy="-1.5908 0.0 0.0"
+                      axis="0 0 1"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <xacro:eslabon nombre="link_3" malla="Link_3.STL" material="MediumYellow"
+                 masa="${m_cuello}"
+                 cx="0.050" cy="0.050" cz="0.050"
+                 ox="0.0"   oy="-0.012" oz="0.010"/>
+
+  <!-- Segundo grado de libertad de la cabeza, perpendicular al anterior. -->
+  <xacro:articulacion nombre="joint_4" padre="link_3" hijo="link_4"
+                      xyz="0.0 -0.024 0.02" rpy="1.5708 0.0 1.5508"
+                      axis="0 0 -1"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <xacro:eslabon nombre="link_4" malla="Link_4.STL" material="MediumYellow"
+                 masa="${m_cabeza}"
+                 cx="0.050" cy="0.050" cz="0.050"/>
+
+  <!-- ==================================================================
+       BRAZO DE LA RAMA joint_5 - 4 GDL
+
+       Hombro en (-0.106, 0, 0.255) en coordenadas del mundo.
+
+       Los dos brazos son fisicamente simetricos, pero el exportador CAD
+       resolvio la orientacion de cada marco de forma independiente: los
+       rpy de un hombro y del otro no son reflejos exactos. Por eso cada
+       brazo se escribe con los origenes que vienen del CAD en lugar de
+       generarse con una macro espejo: forzar la simetria matematica
+       alteraria la cinematica real del robot. La simetria si se
+       aprovecha en las dimensiones, ya que los eslabones homologos
+       comparten caja de colision y masa.
+       ================================================================== -->
+
+  <!-- Eje casi -X del mundo: eleva el brazo adelante y atras. -->
+  <xacro:articulacion nombre="joint_5" padre="link_2" hijo="link_5"
+                      xyz="0.10575 0.09925 0.0" rpy="3.1616 0.0 3.1416"
+                      axis="-1 0 0"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <xacro:eslabon nombre="link_5" malla="Link_5.STL" material="Black"
+                 masa="${m_hombro_a}"
+                 cx="0.050" cy="0.045" cz="0.045"
+                 ox="-0.016" oy="-0.010" oz="0.0"/>
+
+  <!-- Eje casi +Y del mundo: separa el brazo del cuerpo. -->
+  <xacro:articulacion nombre="joint_6" padre="link_5" hijo="link_6"
+                      xyz="-0.031746 -0.0195 0.0" rpy="0.0 0.0 -1.5708"
+                      axis="0 0 -1"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <xacro:eslabon nombre="link_6" malla="Link_6.STL" material="Black"
+                 masa="${m_hombro_b}"
+                 cx="0.045" cy="0.045" cz="0.045"
+                 ox="0.010" oy="-0.012" oz="0.0"/>
+
+  <!-- Tercer eje del hombro: rotacion del brazo sobre su propio eje. -->
+  <xacro:articulacion nombre="joint_7" padre="link_6" hijo="link_7"
+                      xyz="0.019 -0.024 0.00047" rpy="1.5808 0.0 0.0"
+                      axis="1 0 0"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <!-- Segmento largo del brazo: el codo esta a 0.09125 m sobre X. -->
+  <xacro:eslabon nombre="link_7" malla="Link_7.STL" material="Black"
+                 masa="${m_brazo}"
+                 cx="0.100" cy="0.045" cz="0.045"
+                 ox="0.046" oy="0.0"   oz="0.0"/>
+
+  <!-- Codo. -->
+  <xacro:articulacion nombre="joint_8" padre="link_7" hijo="link_8"
+                      xyz="0.09125 0.0 0.0" rpy="1.5708 0.0 -2.5937"
+                      axis="0 1 0"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <xacro:eslabon nombre="link_8" malla="Link_8.STL" material="Black"
+                 masa="${m_antebrazo}"
+                 cx="0.090" cy="0.050" cz="0.050"
+                 ox="0.040" oy="0.0"   oz="0.0"/>
+
+  <!-- ==================================================================
+       BRAZO DE LA RAMA joint_9 - 4 GDL
+
+       Hombro en (0.106, 0, 0.255) en coordenadas del mundo.
+       ================================================================== -->
+
+  <!-- Eje casi +X del mundo: es el espejo del primer eje del otro
+       hombro, lo que explica que una postura simetrica requiera valores
+       de signo opuesto en los dos brazos. -->
+  <xacro:articulacion nombre="joint_9" padre="link_2" hijo="link_9"
+                      xyz="-0.10575 0.09925 0.0" rpy="-0.14 0.0 0.0"
+                      axis="-1 0 0"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <xacro:eslabon nombre="link_9" malla="Link_9.STL" material="Black"
+                 masa="${m_hombro_a}"
+                 cx="0.050" cy="0.045" cz="0.045"
+                 ox="-0.016" oy="-0.010" oz="0.0"/>
+
+  <xacro:articulacion nombre="joint_10" padre="link_9" hijo="link_10"
+                      xyz="-0.031745 -0.0195 0.0" rpy="0.0 0.0 -1.6108"
+                      axis="0 0 -1"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <xacro:eslabon nombre="link_10" malla="Link_10.STL" material="Black"
+                 masa="${m_hombro_b}"
+                 cx="0.045" cy="0.045" cz="0.045"
+                 ox="0.010" oy="-0.012" oz="0.0"/>
+
+  <xacro:articulacion nombre="joint_11" padre="link_10" hijo="link_11"
+                      xyz="0.019 -0.024 -0.0005" rpy="-1.4808 0.0 0.0"
+                      axis="1 0 0"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <xacro:eslabon nombre="link_11" malla="Link_11.STL" material="Black"
+                 masa="${m_brazo}"
+                 cx="0.100" cy="0.045" cz="0.045"
+                 ox="0.046" oy="0.0"   oz="0.0"/>
+
+  <!-- Codo. -->
+  <xacro:articulacion nombre="joint_12" padre="link_11" hijo="link_12"
+                      xyz="0.09125 0.0 0.0" rpy="1.5708 0.0 -2.5867"
+                      axis="0 1 0"
+                      inferior="${-lim_junta}" superior="${lim_junta}"
+                      esfuerzo="${par_max}" velocidad="${vel_max}"/>
+
+  <xacro:eslabon nombre="link_12" malla="Link_12.STL" material="Black"
+                 masa="${m_antebrazo}"
+                 cx="0.090" cy="0.050" cz="0.050"
+                 ox="0.040" oy="0.0"   oz="0.0"/>
+
+  <!-- ==================================================================
+       INTEGRACION CON EL SIMULADOR Y EL SISTEMA DE CONTROL
+       ================================================================== -->
+  <xacro:yaren_gazebo controladores="$(arg controllers_file)"/>
+  <xacro:yaren_ros2_control sim="$(arg sim)"/>
+
+</robot>

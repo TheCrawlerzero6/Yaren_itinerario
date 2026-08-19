@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>yaren_description</name>
+  <version>1.0.0</version>
+  <description>
+    Descripcion cinematica, dinamica y visual del robot Yaren. Define el
+    arbol de eslabones y articulaciones, las propiedades inerciales y de
+    colision necesarias para la simulacion dinamica, y las interfaces de
+    hardware del sistema de control.
+  </description>
+  <maintainer email="alanbajag@gmail.com">Equipo Yaren</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Procesa las plantillas .xacro para generar el URDF plano. -->
+  <exec_depend>xacro</exec_depend>
+
+  <!-- Publica el arbol TF a partir del URDF y del estado articular. -->
+  <exec_depend>robot_state_publisher</exec_depend>
+
+  <!-- Visualizacion del modelo y del arbol TF. -->
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+
+  <!-- Plugin de hardware simulado referenciado desde el bloque
+       ros2_control cuando se expande con sim:=true. -->
+  <exec_depend>gz_ros2_control</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

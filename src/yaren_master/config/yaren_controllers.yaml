@@ -1,0 +1,99 @@
+# yaren_controllers.yaml
+#
+# Configuracion del gestor de controladores del robot Yaren.
+#
+# Este fichero lo carga el plugin de control alojado en el simulador, que
+# instancia el controller_manager dentro del propio proceso de la fisica.
+
+controller_manager:
+  ros__parameters:
+
+    # El gestor se ejecuta a 100 Hz. El paso de integracion del mundo es
+    # de 1 ms, asi que cada ciclo de control abarca 10 pasos de fisica:
+    # suficiente para un seguimiento suave sin cargar la maquina.
+    update_rate: 100
+
+    # Obligatorio: el reloj lo marca el simulador, no el sistema. Si el
+    # gestor usara el reloj real, sus periodos no guardarian relacion con
+    # el tiempo simulado y el seguimiento de trayectorias se desajustaria
+    # en cuanto el factor de tiempo real se alejara de 1.
+    use_sim_time: true
+
+    # ------------------------------------------------------------------
+    # CONTROLADORES DECLARADOS
+    #
+    # Se declara un unico controlador de comando sobre las 12
+    # articulaciones. La razon es que en este marco de trabajo dos
+    # controladores no pueden reclamar a la vez la misma interfaz de
+    # comando: si se anadiera, por ejemplo, un controlador de posicion
+    # directa en paralelo, habria que conmutar entre ambos en cada cambio
+    # de modo de operacion.
+    #
+    # En su lugar, los tres modos de control del paquete (itinerario,
+    # teleoperacion y servicios) publican todos contra este mismo
+    # controlador. La teleoperacion simplemente envia trayectorias muy
+    # cortas, de una unica consigna, en lugar de secuencias completas.
+    # ------------------------------------------------------------------
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    yaren_jtc:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+# ====================================================================
+# CONTROLADOR DE TRAYECTORIA ARTICULAR
+#
+# El orden de esta lista define el orden de los valores en cada punto de
+# trayectoria y en los mensajes de estado. El catalogo de posturas
+# (poses.yaml) declara su propia lista de articulaciones y los nodos de
+# control reordenan sus valores para hacerlos coincidir con la de aqui,
+# de modo que ambos ficheros pueden editarse por separado sin riesgo de
+# enviar una consigna a la articulacion equivocada.
+# ====================================================================
+yaren_jtc:
+  ros__parameters:
+    joints:
+      - joint_1     # giro de cintura
+      - joint_2     # inclinacion del torso
+      - joint_3     # giro de la cabeza
+      - joint_4     # inclinacion de la cabeza
+      - joint_5     # hombro, primer eje
+      - joint_6     # hombro, segundo eje
+      - joint_7     # hombro, tercer eje
+      - joint_8     # codo
+      - joint_9     # hombro opuesto, primer eje
+      - joint_10    # hombro opuesto, segundo eje
+      - joint_11    # hombro opuesto, tercer eje
+      - joint_12    # codo opuesto
+
+    command_interfaces:
+      - position
+
+    state_interfaces:
+      - position
+      - velocity
+
+    state_publish_rate: 50.0
+    action_monitor_rate: 20.0
+
+    # Se exige que toda meta enumere las 12 articulaciones. Aceptar metas
+    # parciales facilitaria enviar consignas incompletas por error y
+    # dejar articulaciones en una postura no prevista.
+    allow_partial_joints_goal: false
+
+    # Al arrancar, la consigna se inicializa con la posicion medida en
+    # lugar de con cero, para que el robot no de un salto brusco en el
+    # instante en que el controlador se activa.
+    open_loop_control: false
+
+    constraints:
+      # Tolerancia de velocidad para dar por detenida una articulacion al
+      # final de la trayectoria.
+      stopped_velocity_tolerance: 0.05
+      # Sin limite de retraso en el instante final: en una maquina virtual
+      # el factor de tiempo real puede caer bastante por debajo de 1 y un
+      # margen estricto abortaria trayectorias que en realidad son
+      # correctas.
+      goal_time: 0.0

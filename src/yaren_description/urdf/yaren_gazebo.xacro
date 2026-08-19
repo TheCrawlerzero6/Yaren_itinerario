@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<!--
+  yaren_gazebo.xacro
+  Propiedades del modelo especificas del simulador: friccion de contacto,
+  auto-colision y carga del plugin del sistema de control.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ==================================================================
+       AUTO-COLISION
+
+       Se desactiva de forma explicita en todos los eslabones. Las cajas
+       envolventes de eslabones consecutivos se solapan en la zona de la
+       articulacion; con auto-colision activa el motor de fisica
+       detectaria una penetracion permanente entre padre e hijo y
+       generaria fuerzas de separacion que desestabilizan el modelo nada
+       mas arrancar.
+       ================================================================== -->
+  <xacro:macro name="sin_autocolision" params="link">
+    <gazebo reference="${link}">
+      <self_collide>false</self_collide>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- ==================================================================
+       EXTREMOS CON AGARRE
+
+       link_8 y link_12 cierran los dos brazos y son los unicos eslabones
+       pensados para entrar en contacto con objetos del entorno. Reciben
+       un coeficiente de rozamiento alto para que puedan empujar o
+       arrastrar las piezas del mundo sin que estas resbalen de
+       inmediato.
+       ================================================================== -->
+  <xacro:macro name="extremo_con_agarre" params="link">
+    <gazebo reference="${link}">
+      <self_collide>false</self_collide>
+      <mu1>1.0</mu1>
+      <mu2>1.0</mu2>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- ==================================================================
+       Bloque que agrupa todo lo anterior mas el plugin de control.
+       ================================================================== -->
+  <xacro:macro name="yaren_gazebo" params="controladores">
+
+    <xacro:sin_autocolision link="base_link"/>
+    <xacro:sin_autocolision link="link_1"/>
+    <xacro:sin_autocolision link="link_2"/>
+    <xacro:sin_autocolision link="link_3"/>
+    <xacro:sin_autocolision link="link_4"/>
+    <xacro:sin_autocolision link="link_5"/>
+    <xacro:sin_autocolision link="link_6"/>
+    <xacro:sin_autocolision link="link_7"/>
+    <xacro:sin_autocolision link="link_9"/>
+    <xacro:sin_autocolision link="link_10"/>
+    <xacro:sin_autocolision link="link_11"/>
+
+    <xacro:extremo_con_agarre link="link_8"/>
+    <xacro:extremo_con_agarre link="link_12"/>
+
+    <!-- ================================================================
+         SISTEMA DE CONTROL
+
+         El plugin instancia un controller_manager dentro del proceso del
+         simulador y lo sincroniza con el paso de integracion de la
+         fisica. Los controladores que debe cargar se declaran en el
+         fichero YAML que se le pasa como parametro.
+
+         Los colores no se redeclaran aqui: el conversor de URDF a SDF
+         traduce los <material><color rgba> del URDF a
+         <material><ambient>/<diffuse> del SDF, de modo que los
+         materiales de yaren_materials.xacro ya llegan al simulador.
+         ================================================================ -->
+    <gazebo>
+      <plugin filename="gz_ros2_control-system"
+              name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>${controladores}</parameters>
+      </plugin>
+    </gazebo>
+
+  </xacro:macro>
+
+</robot>

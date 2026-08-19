@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<!--
+  yaren_ros2_control.xacro
+  Declaracion de las interfaces de hardware de las 12 articulaciones.
+
+  El bloque se genera en una de dos variantes segun el argumento 'sim',
+  de modo que una unica descripcion del robot sirve tanto para la
+  simulacion como para el equipo fisico. Lo que cambia es exclusivamente
+  el plugin de hardware; los nombres de las articulaciones y de las
+  interfaces son identicos en ambos casos, y por eso los mismos
+  controladores y los mismos nodos de control funcionan sin modificacion
+  contra cualquiera de las dos.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ==================================================================
+       Articulacion gobernada por el simulador.
+
+       'initial_value' fija la posicion de partida del eje al arrancar la
+       fisica. Sin el, el estado inicial queda indefinido y el robot
+       aparece en una postura arbitraria antes de que el controlador
+       tome el mando.
+       ================================================================== -->
+  <xacro:macro name="junta_sim" params="nombre inferior superior">
+    <joint name="${nombre}">
+      <command_interface name="position">
+        <param name="min">${inferior}</param>
+        <param name="max">${superior}</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- ==================================================================
+       Articulacion gobernada por un servo del bus fisico.
+
+       'id' es la direccion del servo en el bus serie: es lo que ata el
+       nombre logico de la articulacion al motor concreto que la mueve.
+       Como la correspondencia vive en este parametro y no en el nombre,
+       las articulaciones pueden llamarse de forma descriptiva sin perder
+       la referencia al hardware.
+       ================================================================== -->
+  <xacro:macro name="junta_real" params="nombre id inferior superior">
+    <joint name="${nombre}">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <param name="id">${id}</param>
+      <param name="min">${inferior}</param>
+      <param name="max">${superior}</param>
+    </joint>
+  </xacro:macro>
+
+  <!-- ================================================================== -->
+  <xacro:macro name="yaren_ros2_control" params="sim">
+
+    <xacro:if value="${sim}">
+      <ros2_control name="YarenSimulado" type="system">
+        <hardware>
+          <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+        </hardware>
+
+        <xacro:junta_sim nombre="joint_1"  inferior="${-lim_junta}" superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_2"  inferior="${-lim_junta}" superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_3"  inferior="${-lim_junta}"  superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_4"  inferior="${-lim_junta}"  superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_5"  inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_6"  inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_7"  inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_8"  inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_9"  inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_10" inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_11" inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_sim nombre="joint_12" inferior="${-lim_junta}"   superior="${lim_junta}"/>
+      </ros2_control>
+    </xacro:if>
+
+    <xacro:unless value="${sim}">
+      <ros2_control name="YarenFisico" type="system">
+        <hardware>
+          <plugin>yaren_hw_interface/YarenSystemPositionOnly</plugin>
+          <param name="usb_port">/dev/ttyUSB0</param>
+          <param name="dxl_baud_rate">1000000</param>
+        </hardware>
+
+        <xacro:junta_real nombre="joint_1"  id="1"  inferior="${-lim_junta}" superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_2"  id="2"  inferior="${-lim_junta}" superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_3"  id="3"  inferior="${-lim_junta}"  superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_4"  id="4"  inferior="${-lim_junta}"  superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_5"  id="5"  inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_6"  id="6"  inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_7"  id="7"  inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_8"  id="8"  inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_9"  id="9"  inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_10" id="10" inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_11" id="11" inferior="${-lim_junta}"   superior="${lim_junta}"/>
+        <xacro:junta_real nombre="joint_12" id="12" inferior="${-lim_junta}"   superior="${lim_junta}"/>
+      </ros2_control>
+    </xacro:unless>
+
+  </xacro:macro>
+
+</robot>

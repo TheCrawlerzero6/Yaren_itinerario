@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!--
+  yaren_materials.xacro
+  Materiales de visualizacion del modelo.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Estos materiales sirven a los dos visualizadores sin duplicarse:
+       RViz los lee del URDF publicado por robot_state_publisher, y el
+       conversor de URDF a SDF traduce el <color rgba> a los campos
+       <ambient> y <diffuse> del material SDF que consume el simulador. -->
+
+  <material name="MediumYellow">
+    <color rgba="0.9 0.7 0.0 1.0"/>
+  </material>
+
+  <material name="Black">
+    <color rgba="0.1 0.1 0.1 1.0"/>
+  </material>
+
+</robot>

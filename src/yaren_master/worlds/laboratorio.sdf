@@ -1,0 +1,268 @@
+<?xml version="1.0" ?>
+<!--
+  laboratorio.sdf
+  Entorno de trabajo del robot Yaren.
+
+  Reproduce un puesto de laboratorio: suelo, iluminacion cenital, una
+  mesa de trabajo delante del robot y tres piezas manipulables sobre
+  ella. Las piezas son primitivas y no mallas, para que el coste de la
+  deteccion de contactos sea despreciable frente al del propio robot.
+
+  El robot no se declara aqui. Se inserta en tiempo de ejecucion desde
+  el fichero de arranque a partir del URDF publicado, de forma que el
+  mundo siga siendo utilizable con cualquier otra descripcion.
+-->
+<sdf version="1.9">
+  <world name="laboratorio">
+
+    <!-- ================================================================
+         FISICA
+
+         Paso de integracion de 1 ms. Es un compromiso: pasos mas largos
+         hacen inestable la cadena articulada bajo control de posicion,
+         y pasos mas cortos multiplican el coste de calculo, algo que se
+         nota de inmediato al ejecutar en una maquina virtual.
+         ================================================================ -->
+    <physics name="paso_1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <gravity>0 0 -9.81</gravity>
+
+    <!-- ================================================================
+         SISTEMAS DEL SIMULADOR
+
+         A diferencia de un mundo por defecto, aqui hay que declarar
+         explicitamente cada sistema que debe estar activo:
+
+           Physics           integra la dinamica
+           UserCommands      permite insertar y borrar modelos en caliente
+           SceneBroadcaster  publica la escena hacia la interfaz grafica
+           Contact           habilita los sensores y eventos de contacto
+
+         Si falta SceneBroadcaster el mundo simula pero no se ve nada;
+         si falta UserCommands no es posible insertar el robot.
+         ================================================================ -->
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system"
+            name="gz::sim::systems::Contact"/>
+
+    <!-- ================================================================
+         ESCENA E ILUMINACION
+         ================================================================ -->
+    <scene>
+      <ambient>0.6 0.6 0.6 1</ambient>
+      <background>0.75 0.80 0.86 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <light type="directional" name="sol">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 6 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.25 0.25 0.25 1</specular>
+      <direction>-0.4 0.3 -0.9</direction>
+      <attenuation>
+        <range>25</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- ================================================================
+         SUELO
+
+         Se modela como un plano infinito y no como una caja: el plano no
+         tiene masa ni volumen que integrar y su deteccion de contacto es
+         analitica.
+         ================================================================ -->
+    <model name="suelo">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.9</mu>
+                <mu2>0.9</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.35 0.37 0.40 1</ambient>
+            <diffuse>0.45 0.47 0.50 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ================================================================
+         MESA DE TRABAJO
+
+         Estatica: no participa en la integracion dinamica, solo aporta
+         una superficie de apoyo y una referencia visual de escala.
+
+         Sus dimensiones y su posicion las fija el alcance del robot, no
+         la estetica. Los hombros quedan en (-+0.106, 0, 0.255) y cada
+         brazo alcanza unos 0.24 m desde su hombro, sumando las
+         distancias entre ejes consecutivos. Con el tablero a 0.17 m y la
+         mesa centrada en y = 0.24, una pieza apoyada en (-0.11, 0.20,
+         0.195) queda a 0.209 m del hombro mas cercano: dentro del
+         alcance y con margen para que el codo no trabaje completamente
+         extendido.
+
+         La mesa ocupa y de 0.14 a 0.34 y la base del robot y de -0.09 a
+         0.09, de modo que no llegan a tocarse.
+
+         Se asume que el robot mira hacia +Y. Esa orientacion no puede
+         deducirse de la descripcion del robot y hay que confirmarla
+         visualmente; si resultara ser la contraria, basta invertir el
+         signo de la coordenada y de esta mesa y de las tres piezas.
+         ================================================================ -->
+    <model name="mesa_trabajo">
+      <static>true</static>
+      <pose>0.0 0.24 0.0 0 0 0</pose>
+      <link name="tablero">
+        <pose>0 0 0.16 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.60 0.20 0.02</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.60 0.20 0.02</size></box>
+          </geometry>
+          <material>
+            <ambient>0.45 0.30 0.18 1</ambient>
+            <diffuse>0.62 0.42 0.24 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="patas">
+        <pose>0 0 0.075 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.52 0.14 0.15</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.52 0.14 0.15</size></box>
+          </geometry>
+          <material>
+            <ambient>0.20 0.20 0.22 1</ambient>
+            <diffuse>0.28 0.28 0.30 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ================================================================
+         PIEZAS MANIPULABLES
+
+         Son cuerpos dinamicos: tienen masa e inercia y responden al
+         contacto con los antebrazos del robot.
+
+         Se apoyan sobre el tablero (z = 0.17) en el borde mas cercano al
+         robot, y su coordenada x coincide con la de los hombros
+         (-+0.106) para que cada brazo tenga una pieza justo delante sin
+         necesidad de girar la cintura.
+         ================================================================ -->
+
+    <model name="cubo_rojo">
+      <pose>-0.11 0.20 0.195 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>0.08</mass>
+          <!-- Cubo homogeneo de 0.05 m: I = m*a^2/6 -->
+          <inertia>
+            <ixx>0.0000333</ixx><iyy>0.0000333</iyy><izz>0.0000333</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <material>
+            <ambient>0.55 0.08 0.08 1</ambient>
+            <diffuse>0.85 0.12 0.12 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="cilindro_azul">
+      <pose>0.0 0.20 0.200 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>0.06</mass>
+          <!-- Cilindro r=0.025 h=0.06: Ixx=Iyy=m(3r^2+h^2)/12, Izz=m*r^2/2 -->
+          <inertia>
+            <ixx>0.0000281</ixx><iyy>0.0000281</iyy><izz>0.0000188</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><cylinder><radius>0.025</radius><length>0.06</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.025</radius><length>0.06</length></cylinder></geometry>
+          <material>
+            <ambient>0.08 0.20 0.55 1</ambient>
+            <diffuse>0.12 0.32 0.85 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="cubo_verde">
+      <pose>0.11 0.20 0.195 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>0.08</mass>
+          <inertia>
+            <ixx>0.0000333</ixx><iyy>0.0000333</iyy><izz>0.0000333</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <material>
+            <ambient>0.10 0.45 0.15 1</ambient>
+            <diffuse>0.16 0.70 0.24 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
